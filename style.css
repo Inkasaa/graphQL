@@ -1,0 +1,25 @@
+body {
+  font-family: sans-serif;
+  margin: 2rem;
+  background: #f5f5f5;
+}
+
+input {
+  display: block;
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+}
+
+button {
+  padding: 0.5rem 1rem;
+}
+
+.hidden {
+  display: none;
+}
+
+svg {
+  border: 1px solid #ccc;
+  background: white;
+  margin-bottom: 2rem;
+}

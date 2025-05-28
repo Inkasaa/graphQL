@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>GraphQL Profile</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="login-container">
+    <h2>Login</h2>
+    <input type="text" id="username" placeholder="Username or Email" />
+    <input type="password" id="password" placeholder="Password" />
+    <button onclick="login()">Login</button>
+    <p id="login-error"></p>
+  </div>
+
+  <div id="profile-container" class="hidden">
+    <button onclick="logout()">Logout</button>
+    <h2>Welcome, <span id="user-login"></span></h2>
+    <p>Total XP: <span id="total-xp"></span></p>
+
+    <h3>XP Over Time</h3>
+    <svg id="xp-line" width="400" height="150"></svg>
+
+    <h3>Pass/Fail Ratio</h3>
+    <svg id="pass-fail-pie" width="150" height="150"></svg>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
