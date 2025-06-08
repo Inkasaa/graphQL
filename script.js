@@ -130,73 +130,141 @@ async function executeGraphql(query) {
 async function loadProfile() {
 
   const data = await executeGraphql(userQuery)
-  console.log(data)
   const user = data.data.user[0];
   const transactions = data.data.transaction;
-  const grades = data.data.progress;
 
   userLogin.textContent = user.login;
 
-  const totalXp = transactions.reduce((sum, t) => sum + t.amount, 0);
+  const xpTransactions = transactions.filter(t => 
+    t.type === 'xp' &&
+    t.path.startsWith('/gritlab/school-curriculum/') &&
+    (
+      !t.path.includes('/gritlab/school-curriculum/piscine-js/')  || // exclude sub-paths
+      t.path === '/gritlab/school-curriculum/piscine-js' 
+  )
+  );
+
+  const xpProjects = transactions.filter(t => 
+    t.type === 'xp' &&
+    t.path.startsWith('/gritlab/school-curriculum/') &&
+    !t.path.includes('/gritlab/school-curriculum/piscine-js/') &&
+    !t.path.includes('/gritlab/school-curriculum/piscine-go/') &&
+    !t.path.includes('/gritlab/school-curriculum/checkpoint')
+  );
+   console.log(xpProjects)
+   //console.log(grades)
+  const xpGoCheckpoints = transactions.filter(t => 
+    t.type === 'xp' &&
+    t.path.startsWith('/gritlab/school-curriculum/checkpoint/')
+  
+  );
+  
+    const xpJSCheckpoints = transactions.filter(t => 
+    t.type === 'xp' &&
+    t.path.startsWith('/gritlab/school-curriculum/checkpoint-js')
+  
+  );
+
+  //console.log(transactions)
+  //console.log(xpGoCheckpoints)
+
+  const totalXp = xpTransactions.reduce((sum, t) => sum + t.amount, 0);
+  const totalJSCheckpointXp = xpJSCheckpoints.reduce((sum, t) => sum + t.amount, 0);
+  const totalGoCheckpointXp = xpGoCheckpoints.reduce((sum, t) => sum + t.amount, 0);
+  const totalProjectsXp = totalXp - totalGoCheckpointXp - totalJSCheckpointXp
+
   totalXpEl.textContent = totalXp;
 
-  drawXPLineChart(transactions);
-  drawPassFailPie(grades);
+  drawXpBarChart(xpProjects);
+  drawXpPieChart(totalJSCheckpointXp, totalGoCheckpointXp, totalProjectsXp);
 }
 
-function drawXPLineChart(transactions) {
-  const svg = document.getElementById("xp-line");
+function drawXpBarChart(transactions) {
+  const svg = document.getElementById("xp-bar");
   svg.innerHTML = "";
-  if (transactions.length === 0) return;
+  if (!transactions || transactions.length === 0) return;
 
-  const margin = 20;
   const width = svg.width.baseVal.value;
   const height = svg.height.baseVal.value;
 
+  const topMargin = 20;
+  const bottomMargin = 60; // lisää tilaa tekstille
+
   const maxXp = Math.max(...transactions.map(t => t.amount));
-  const xStep = (width - 2 * margin) / (transactions.length - 1);
+  const barSpacing = 2;
+  const barWidth = Math.max((width - 2 * topMargin) / transactions.length - barSpacing, 1);
 
-  transactions.forEach((t, i) => {
-    const x = margin + i * xStep;
-    const y = height - margin - (t.amount / maxXp) * (height - 2 * margin);
+transactions.forEach((t, i) => {
+  const barHeight = (t.amount / maxXp) * (height - topMargin - bottomMargin);
+  const x = topMargin + i * (barWidth + barSpacing);
+  const y = height - bottomMargin - barHeight;
 
-    svg.innerHTML += `<circle cx="${x}" cy="${y}" r="3" fill="#a44fff" />`;
+  // Pylväs
+  svg.innerHTML += `<rect x="${x}" y="${y}" width="${barWidth}" height="${barHeight}" class="xp-bar" />`;
 
-    if (i > 0) {
-      const prev = transactions[i - 1];
-      const px = margin + (i - 1) * xStep;
-      const py = height - margin - (prev.amount / maxXp) * (height - 2 * margin);
-      svg.innerHTML += `<line x1="${px}" y1="${py}" x2="${x}" y2="${y}" stroke="#a44fff" />`;
-    }
+  // XP määrä pylvään yläpuolelle
+  svg.innerHTML += `<text x="${x + barWidth / 2}" y="${y - 5}" font-size="6" text-anchor="middle" fill="#000">${t.amount}</text>`;
+
+  // Projektiotsikko pylvään alle
+  const label = t.path.split('/').pop().replace(/-/g, ' ');
+  const textY = height - 35;
+  svg.innerHTML += `<text x="${x + barWidth / 2}" y="${textY}" font-size="8" text-anchor="middle" transform="rotate(-30 ${x + barWidth / 2},${textY})">${label}</text>`;
+});
+}
+
+
+
+
+
+function drawXpPieChart(totalJSCheckpointXp, totalGoCheckpointXp, totalProjectsXp) {
+  const svg = document.getElementById("xp-pie");
+  svg.innerHTML = "";
+
+  const data = [
+    { label: "JS", value: totalJSCheckpointXp, color: "#ffa500" },
+    { label: "Go", value: totalGoCheckpointXp, color: "#4caf50" },
+    { label: "Projects", value: totalProjectsXp, color: "#8bc34a" },
+  ];
+
+  const total = data.reduce((sum, d) => sum + d.value, 0);
+  if (total === 0) return;
+
+  const cx = 75, cy = 75, radius = 60;
+  let startAngle = 0;
+
+  // Piirretään piirakka
+  data.forEach(d => {
+    const sliceAngle = (d.value / total) * 2 * Math.PI;
+
+    const x1 = cx + radius * Math.cos(startAngle);
+    const y1 = cy + radius * Math.sin(startAngle);
+    const x2 = cx + radius * Math.cos(startAngle + sliceAngle);
+    const y2 = cy + radius * Math.sin(startAngle + sliceAngle);
+
+    const largeArc = sliceAngle > Math.PI ? 1 : 0;
+
+    svg.innerHTML += `
+      <path d="M${cx},${cy} L${x1},${y1} A${radius},${radius} 0 ${largeArc} 1 ${x2},${y2} Z"
+            fill="${d.color}" />
+    `;
+
+    startAngle += sliceAngle;
+  });
+
+  // Lisätään selitykset (legend)
+  // Legendan alkuperäinen sijainti piirakan oikealle puolelle
+  const legendX = cx + radius + 20;
+  let legendY = cy - radius;
+
+  data.forEach(d => {
+    // Värillinen neliö
+    svg.innerHTML += `
+      <rect x="${legendX}" y="${legendY}" width="15" height="15" fill="${d.color}" />
+      <text x="${legendX + 20}" y="${legendY + 12}" font-family="Arial" font-size="14">${d.label}</text>
+    `;
+    legendY += 25; // Siirrytään seuraavalle riville
   });
 }
 
-function drawPassFailPie(grades) {
-  const svg = document.getElementById("pass-fail-pie");
-  svg.innerHTML = "";
-
-  const pass = grades.filter(g => g.grade === 1).length;
-  const fail = grades.filter(g => g.grade === 0).length;
-  const total = pass + fail;
-
-  if (total === 0) return;
-
-  const radius = 60;
-  const cx = 75, cy = 75;
-  const passAngle = (pass / total) * 2 * Math.PI;
-
-  const x1 = cx + radius * Math.cos(0);
-  const y1 = cy + radius * Math.sin(0);
-  const x2 = cx + radius * Math.cos(passAngle);
-  const y2 = cy + radius * Math.sin(passAngle);
-
-  const largeArc = passAngle > Math.PI ? 1 : 0;
-
-  svg.innerHTML += `
-    <circle cx="${cx}" cy="${cy}" r="${radius}" fill="#ffb3b3" />
-    <path d="M${cx},${cy} L${x1},${y1} A${radius},${radius} 0 ${largeArc} 1 ${x2},${y2} Z"
-          fill="#a44fff" />
-  `;
-}
 
 loadProfile();
