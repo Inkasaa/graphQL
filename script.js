@@ -1,36 +1,9 @@
-
-
-/*FILTER! :
-const xpQuery = `
-query {
-  transaction(
-    where: {
-      _and: [
-        { event: { path: { _eq: "/gritlab/school-curriculum" }}},
-        { type: { _eq: "xp" } }
-      ]
-    }
-    order_by: { createdAt: asc }
-  ) {
-    amount
-    createdAt
-    path
-  }
-}
-`*/
-const loginContainer = document.getElementById("login-container");
-const profileContainer = document.getElementById("profile-container");
-const userLogin = document.getElementById("user-login");
-const totalXpEl = document.getElementById("total-xp");
-const loginError = document.getElementById("login-error");
-
 const graphqlPath = `https://01.gritlab.ax/api/graphql-engine/v1/graphql`;
 
 let jwt = null;
 
 async function login() {
   const username = document.getElementById("username").value;
-  console.log('username:', username)
   const password = document.getElementById("password").value;
   const credentials = btoa(`${username}:${password}`);
 
@@ -61,46 +34,28 @@ function logout() {
 const userQuery = `
 {
     user {
-        id
         login
         attrs
-        campus
-        labels {
-            labelId
-            labelName
-        }
-        createdAt
-        updatedAt
         auditRatio
-        totalUp
-        totalUpBonus
-        totalDown
     }
     
     wip: progress (
-        where: {isDone: {_eq: false}, grade : {_is_null: true}}
-        order_by: [{createdAt: asc}]
+        where: {isDone: {_eq: true }, grade : {_is_null: false}
+        }
+
     ){
-        id
-        eventId
-        createdAt
-        updatedAt
-        path
-        group{
+        group {
             members{
-                userLogin
+                userLogin             
             }
         }
     }
     transaction {
-      id
       path
       amount
       type
   }
-    progress {
-      grade
-  }
+
 }`;
 
 const generateQueryJson = (queryStr) => JSON.stringify({ query: queryStr });
@@ -117,6 +72,7 @@ async function executeGraphql(query) {
   }).then(response => {
     if (response.ok) {
       const data = response.json();
+      console.log(data)
       return data
     } else {
       response.json().then(errorData => { showMessage(errorData.error) });
@@ -127,14 +83,42 @@ async function executeGraphql(query) {
   });
 };
 
-async function loadProfile() {
+const loginContainer = document.getElementById("login-container");
+const profileContainer = document.getElementById("profile-container");
+const userLogin = document.getElementById("user-login");
+const firstName = document.getElementById("first-name");
+const lastName = document.getElementById("last-name")
+const auditRatio = document.getElementById("audit-ratio")
+const totalXpEl = document.getElementById("total-xp");
+const loginError = document.getElementById("login-error");
+const collaborators = document.getElementById("collaborators")
 
+async function loadProfile() {
   const data = await executeGraphql(userQuery)
+
   const user = data.data.user[0];
-  const transactions = data.data.transaction;
 
   userLogin.textContent = user.login;
+  firstName.textContent = user.attrs.firstName
+  lastName.textContent = user.attrs.lastName;
+  auditRatio.textContent = user.auditRatio.toFixed(2);
+ 
+  const groupMembers = new Set();
+  const wip = data.data.wip;
 
+wip
+  .filter(entry => entry.group !== null) // only entries with group
+  .forEach(entry => {
+    entry.group.members.forEach(member => {
+      if (member.userLogin !== user.login) {
+        groupMembers.add(member.userLogin);
+      }
+    });
+  });
+  
+  collaborators.textContent = Array.from(groupMembers).join(', ');
+
+  const transactions = data.data.transaction;
   const xpTransactions = transactions.filter(t => 
     t.type === 'xp' &&
     t.path.startsWith('/gritlab/school-curriculum/') &&
@@ -147,36 +131,36 @@ async function loadProfile() {
   const xpProjects = transactions.filter(t => 
     t.type === 'xp' &&
     t.path.startsWith('/gritlab/school-curriculum/') &&
-    !t.path.includes('/gritlab/school-curriculum/piscine-js/') &&
+    !t.path.includes('/gritlab/school-curriculum/piscine-js') &&
     !t.path.includes('/gritlab/school-curriculum/piscine-go/') &&
     !t.path.includes('/gritlab/school-curriculum/checkpoint')
   );
-   console.log(xpProjects)
-   //console.log(grades)
-  const xpGoCheckpoints = transactions.filter(t => 
+
+   const xpGoCheckpoints = transactions.filter(t => 
     t.type === 'xp' &&
     t.path.startsWith('/gritlab/school-curriculum/checkpoint/')
-  
   );
   
     const xpJSCheckpoints = transactions.filter(t => 
     t.type === 'xp' &&
     t.path.startsWith('/gritlab/school-curriculum/checkpoint-js')
-  
   );
 
-  //console.log(transactions)
-  //console.log(xpGoCheckpoints)
+    const xpJSPiscine = transactions.filter(t => 
+    t.type === 'xp' &&
+    t.path === '/gritlab/school-curriculum/piscine-js'
+  );
 
   const totalXp = xpTransactions.reduce((sum, t) => sum + t.amount, 0);
   const totalJSCheckpointXp = xpJSCheckpoints.reduce((sum, t) => sum + t.amount, 0);
   const totalGoCheckpointXp = xpGoCheckpoints.reduce((sum, t) => sum + t.amount, 0);
-  const totalProjectsXp = totalXp - totalGoCheckpointXp - totalJSCheckpointXp
+  const totalProjectsXp = xpProjects.reduce((sum, t) => sum + t.amount, 0);
+  const jsPiscineXp = xpJSPiscine.reduce((sum, t) => sum + t.amount, 0)
 
-  totalXpEl.textContent = totalXp;
+  totalXpEl.textContent = totalXp/1000;
 
   drawXpBarChart(xpProjects);
-  drawXpPieChart(totalJSCheckpointXp, totalGoCheckpointXp, totalProjectsXp);
+  drawXpPieChart(totalJSCheckpointXp, totalGoCheckpointXp, totalProjectsXp, jsPiscineXp);
 }
 
 function drawXpBarChart(transactions) {
@@ -187,8 +171,8 @@ function drawXpBarChart(transactions) {
   const width = svg.width.baseVal.value;
   const height = svg.height.baseVal.value;
 
-  const topMargin = 20;
-  const bottomMargin = 60; // lisää tilaa tekstille
+  const topMargin = 30; // space above the bars
+  const bottomMargin = 60; // space below the bars
 
   const maxXp = Math.max(...transactions.map(t => t.amount));
   const barSpacing = 2;
@@ -202,28 +186,25 @@ transactions.forEach((t, i) => {
   // Pylväs
   svg.innerHTML += `<rect x="${x}" y="${y}" width="${barWidth}" height="${barHeight}" class="xp-bar" />`;
 
-  // XP määrä pylvään yläpuolelle
-  svg.innerHTML += `<text x="${x + barWidth / 2}" y="${y - 5}" font-size="6" text-anchor="middle" fill="#000">${t.amount}</text>`;
+  // Project xp
+  svg.innerHTML += `<text x="${x + barWidth / 2}" y="${y - 5}" font-size="10" text-anchor="middle" fill="#000">${t.amount/1000}</text>`;
 
-  // Projektiotsikko pylvään alle
+  // Project name
   const label = t.path.split('/').pop().replace(/-/g, ' ');
-  const textY = height - 35;
-  svg.innerHTML += `<text x="${x + barWidth / 2}" y="${textY}" font-size="8" text-anchor="middle" transform="rotate(-30 ${x + barWidth / 2},${textY})">${label}</text>`;
+  const textY = height - 30;
+  svg.innerHTML += `<text x="${x + barWidth / 2}" y="${textY}" font-size="10" text-anchor="middle" transform="rotate(-30 ${x + barWidth / 2},${textY})">${label}</text>`;
 });
 }
 
-
-
-
-
-function drawXpPieChart(totalJSCheckpointXp, totalGoCheckpointXp, totalProjectsXp) {
+function drawXpPieChart(totalJSCheckpointXp, totalGoCheckpointXp, totalProjectsXp, jsPiscineXp) {
   const svg = document.getElementById("xp-pie");
   svg.innerHTML = "";
 
   const data = [
-    { label: "JS", value: totalJSCheckpointXp, color: "#ffa500" },
-    { label: "Go", value: totalGoCheckpointXp, color: "#4caf50" },
-    { label: "Projects", value: totalProjectsXp, color: "#8bc34a" },
+    { label: "Go-checkpoints", value: totalGoCheckpointXp, color: "#8bc34a" },
+        { label: "Js-checkpoints", value: totalJSCheckpointXp, color: "#e91e63"},
+    { label: "Js-piscine", value: jsPiscineXp, color: "#ffa500" },
+    { label: "Projects", value: totalProjectsXp, color: "black"},
   ];
 
   const total = data.reduce((sum, d) => sum + d.value, 0);
@@ -234,6 +215,7 @@ function drawXpPieChart(totalJSCheckpointXp, totalGoCheckpointXp, totalProjectsX
 
   // Piirretään piirakka
   data.forEach(d => {
+
     const sliceAngle = (d.value / total) * 2 * Math.PI;
 
     const x1 = cx + radius * Math.cos(startAngle);
@@ -260,11 +242,9 @@ function drawXpPieChart(totalJSCheckpointXp, totalGoCheckpointXp, totalProjectsX
     // Värillinen neliö
     svg.innerHTML += `
       <rect x="${legendX}" y="${legendY}" width="15" height="15" fill="${d.color}" />
-      <text x="${legendX + 20}" y="${legendY + 12}" font-family="Arial" font-size="14">${d.label}</text>
+      <text x="${legendX + 20}" y="${legendY + 12}" font-family="Arial" font-size="14">${d.label}: ${d.value/ 1000}</text>
     `;
     legendY += 25; // Siirrytään seuraavalle riville
   });
 }
-
-
 loadProfile();

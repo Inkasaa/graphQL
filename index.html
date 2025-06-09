@@ -17,14 +17,22 @@
 
   <div id="profile-container" class="hidden">
     <button onclick="logout()">Logout</button>
-    <h2>Welcome, <span id="user-login"></span></h2>
-    <p>Total XP: <span id="total-xp"></span></p>
+    <h2>Welcome, <span id="user-login"></span>!</h2>
 
-    <h3>projct xp</h3>
+  <div class="info-box">
+    <h3>Your profile</h3>
+     <p>First name: <span id="first-name"></span></p>
+     <p>Last name: <span id="last-name"></span></p>
+     <p>Audit ratio: <span id="audit-ratio"></span></p>
+     <p>Total XP: <span id="total-xp"></span></p>
+     <p>Collaborators: <span id="collaborators"></span></p>
+  </div>
+
+    <h3>XP earned by project</h3>
     <svg id="xp-bar" width="800" height="300"></svg>
 
-    <h3>xp-pie</h3>
-    <svg id="xp-pie" width="150" height="150"></svg>
+    <h3>Total XP-pie</h3>
+    <svg id="xp-pie" width="350" height="150"></svg>
   </div>
 
   <script src="script.js"></script>
