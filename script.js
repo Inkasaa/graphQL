@@ -243,3 +243,12 @@ function drawXpPieChart(jsXp, goXp, projectsXp, piscineXp) {
     legendY += 25;
   });
 }
+
+// Attempt auto-login on page load
+jwt = localStorage.getItem("jwt");
+
+if (jwt) {
+  loginContainer.classList.add("hidden");
+  profileContainer.classList.remove("hidden");
+  loadProfile();
+}
